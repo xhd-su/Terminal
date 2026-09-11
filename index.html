@@ -45,11 +45,11 @@ body {
 }
 
 .terminal {
-  width: 1500px;
-  max-width: 92%;
-  height: min(600px, 80vh);
-  margin: clamp(16px, 4vh, 40px) auto;
-  padding: clamp(12px, 2vw, 20px);
+  width: 98vw;
+  max-width: 98vw;
+  height: 96vh;
+  margin: 2vh auto;
+  padding: clamp(12px, 2vw, 24px);
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -362,148 +362,9 @@ pre {
         return div.innerHTML;
       }
 
-      // --- Contenu des "fichiers" affichés via cat ---
-      // Ces pages étaient auparavant des répertoires séparés (cd contact/gym/profile).
-      // Elles sont maintenant simulées comme des fichiers texte : 'cat' affiche
-      // un résumé dans le terminal, 'open' redirige vers la page complète.
-
-      function catProfile() {
-        return `<span class="output">== profile.sys ==
-[USER_PROFILE]
-status=active
-age=23
-role=cybersecurity_student
-school=HELMo
-specialization=SOC_analysis, networks, scripting, DFIR
-learning_platform=TryHackMe
-summary="Passionate about offensive & defensive security. Always learning, always hacking."
-
-== skills.db ==
-+---------------------+--------------------------------------------------------+
-| category            | skills                                                 |
-+---------------------+--------------------------------------------------------+
-| SOC Tools           | Alert Analysis, Log Correlation, SIEM (e.g. Splunk)    |
-| Programming         | Python, C#, HTML, CSS, JavaScript, SQL                 |
-| Networking          | VLANs, Firewalls, Operating Systems                    |
-| Game Development    | Unity                                                  |
-| Linux & Scripting   | Bash, Systemctl, File Permissions, Cron                |
-| DFIR Tools          | Volatility, Autopsy, Log carving, Timeline analysis    |
-+---------------------+--------------------------------------------------------+
-
-== traits.ini ==
-[Personality]
-calm_under_pressure=true
-dedicated=absolutely
-problem_solving=excellent
-discipline=high
-focus=sharp
-thinking_style=adaptive
-
-== work.log ==
-[2021-07-03] Job started: Cleaner @ GOM
-[2022-08-05] Job ended:   Cleaner @ GOM
-[2022-06-27] Job started: Cleaner @ ISS
-[2026-08-14] Job ended:   Cleaner @ ISS
-[UNKNOWN] Side task:   Mover/Delivery - various contracts
-
-== hobbies.cfg ==
-[Hobbies]
-powerlifting=enabled
-cats=always_present
-coffee=mandatory
-ctf_competitions=frequent
-game_development=ongoing
-</span>`;
-      }
-
-      function catContact() {
-        return `<span class="output">== contact_info.txt ==
-
-Email:
-  mahichahid2003@gmail.com
-
-GitHub:
-  <a href="https://github.com/xhd-su" target="_blank" rel="noopener">github.com/xhd-su</a>
-
-Social:
-  <a href="https://www.instagram.com/ibn_chafik/" target="_blank" rel="noopener">@ibn_chafik (Instagram)</a>
-  <a href="https://www.linkedin.com/in/chahid-mahi-4b0709250/" target="_blank" rel="noopener">@Mahi_Chahid (LinkedIn)</a>
-  <a href="https://tryhackme.com/p/xhd" target="_blank" rel="noopener">@xhd (TryHackMe)</a>
-  <a href="https://discordapp.com/users/xhd_00" target="_blank" rel="noopener">@xhd (Discord)</a>
-  <a href="https://steamcommunity.com/id/afriquedusud/" target="_blank" rel="noopener">@su (Steam)</a>
-  <a href="https://www.faceit.com/en/players/MaRTyR_exe" target="_blank" rel="noopener">@xhd_su (Faceit)</a>
-  <a href="https://www.youtube.com/channel/UCHdLZZPCp3JX7KKefog9VpQ" target="_blank" rel="noopener">I Meow Back To Kittens (YouTube)</a>
-</span>`;
-      }
-
-      function calculateDOTS(bodyweight, total) {
-        const a = -0.000001093, b = 0.0007391293, c = -0.1918759221, d = 24.0900756, e = -307.75076;
-        const coeff = a * bodyweight ** 4 + b * bodyweight ** 3 + c * bodyweight ** 2 + d * bodyweight + e;
-        return (total * 500) / coeff;
-      }
-
-      function asciiBar(percent) {
-        const total = 10;
-        const filled = Math.round((percent / 100) * total);
-        return "[" + "#".repeat(filled) + "-".repeat(total - filled) + "]";
-      }
-
-      function timeSinceGymStart() {
-        const startDate = new Date(2021, 9, 20);
-        const today = new Date();
-        let years = today.getFullYear() - startDate.getFullYear();
-        let months = today.getMonth() - startDate.getMonth();
-        let days = today.getDate() - startDate.getDate();
-        if (days < 0) {
-          months--;
-          days += new Date(today.getFullYear(), today.getMonth(), 0).getDate();
-        }
-        if (months < 0) {
-          years--;
-          months += 12;
-        }
-        return `${years} years - ${months} months - ${days} days`;
-      }
-
-      function catGym() {
-        const squatPR = 170, squatGoal = 220;
-        const benchPR = 140, benchGoal = 160;
-        const deadliftPR = 210, deadliftGoal = 260;
-        const totalPR = squatPR + benchPR + deadliftPR;
-        const totalGoal = squatGoal + benchGoal + deadliftGoal;
-        const bodyweight = 90;
-        const dots = calculateDOTS(bodyweight, totalPR).toFixed(2);
-        const pct = (pr, goal) => Math.min((pr / goal) * 100, 100);
-        const row = (label, pr, goal) =>
-          `  ${label.padEnd(9)}: ${String(pr).padStart(3)} kg  ${asciiBar(pct(pr, goal))} ${pct(pr, goal).toFixed(1)}%  (goal ${goal} kg)`;
-
-        return `<span class="output">== gym.log ==
-Time since first day at gym: ${timeSinceGymStart()}
-
-SBD PRs:
-${row("Squat", squatPR, squatGoal)}
-${row("Bench", benchPR, benchGoal)}
-${row("Deadlift", deadliftPR, deadliftGoal)}
-${row("Total", totalPR, totalGoal)}
-
-DOTS score: ${dots}
-
-Goals:
-  Squat           : 220 kg
-  Bench           : 160 kg
-  Deadlift        : 260 kg
-  Overhead Press  : 100 kg
-  Strict Curl     : 60 kg
-  Weight          : 93 kg
-  Bodyfat         : 10-12%
-
-(full dashboard with charts: 'open gym.txt')
-</span>`;
-      }
-
       // Variables d'état
       let currentDirectory = "Terminal"; 
-      const files = ["cv.pdf", "profile.txt", "contact.txt", "gym.txt"];
+      const files = ["cv.pdf", "profile", "contact", "gym"];
       const directories = []; 
       const commandsList = ["ls", "cd", "open", "clear", "help", "sudo", "exit", "whoami", "tree", "cat"];
       let rootMode = false;
@@ -668,9 +529,9 @@ Goals:
           const name = args[0];
           const openTargets = {
             "cv.pdf": "cv.pdf",
-            "profile.txt": "profile/index.html",
-            "contact.txt": "contact/index.html",
-            "gym.txt": "gym/index.html"
+            "profile": "profile/index.html",
+            "contact": "contact/index.html",
+            "gym": "gym/index.html"
           };
           if (currentDirectory === "Terminal" && openTargets[name]) {
             openInFrame(`${githubBaseURL}/${openTargets[name]}`);
@@ -682,9 +543,7 @@ Goals:
           if (!args[0]) return "Specify a file. Usage: cat &lt;file&gt;";
           const name = args[0];
           if (name === "cv.pdf") return "cat: cv.pdf: binary file (use 'open cv.pdf' instead).";
-          if (name === "profile.txt") return catProfile();
-          if (name === "contact.txt") return catContact();
-          if (name === "gym.txt") return catGym();
+          if (files.includes(name)) return `cat: ${escapeHTML(name)}: use 'open ${escapeHTML(name)}' to view this file.`;
           return `cat: ${escapeHTML(name)}: No such file.`;
         },
         cd: (args) => {
@@ -758,7 +617,7 @@ Goals:
 <span class="output">ls</span> - Displays files and directories in the current directory.<br>
 <span class="output">cd <i>directory</i></span> - Change directory. Example: 'cd projects'.<br>
 <span class="output">open <i>file</i></span> - Opens a file. Example: 'open cv.pdf'.<br>
-<span class="output">cat <i>file</i></span> - Displays file content. Example: 'cat profile.txt'.<br>
+<span class="output">cat <i>file</i></span> - Displays file content when available.<br>
 <span class="output">clear</span> - Clears the terminal screen.<br>
 <span class="output">whoami</span> - Displays current user.<br>
 <span class="output">tree</span> - Displays directory tree.<br>
