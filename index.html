@@ -166,6 +166,11 @@ pre {
   color: #00FF00;
 }
 
+.section-title {
+  color: #66ff66;
+  font-weight: bold;
+}
+
 #output a {
   color: #00ff88;
   text-decoration: underline;
@@ -421,6 +426,13 @@ pre {
 
       backButton.addEventListener("click", closeFrame);
 
+      // Permet aux pages chargées dans l'iframe (secret, profile, etc.) de
+      // revenir au terminal sans se recharger elles-mêmes à l'intérieur de
+      // l'iframe. Ces pages peuvent appeler :
+      //   if (window.parent.returnToTerminal) window.parent.returnToTerminal();
+      //   else window.location.href = '../index.html'; // repli si ouverte seule
+      window.returnToTerminal = closeFrame;
+
       // --- Sécurité : échappement HTML ---
       // Toute valeur qui provient de l'utilisateur (commande tapée, arguments)
       // DOIT passer par escapeHTML() avant d'être insérée via innerHTML.
@@ -476,20 +488,16 @@ ${bottom}
            &gt; ^ &lt;</span>`;
       }
 
-      // --- stats : session (client) + compteur global partagé (CountAPI) ---
+      // --- stats : session uniquement (client-side) ---
       function buildStats() {
         const uptimeSec = Math.floor((Date.now() - sessionStart) / 1000);
         const mins = Math.floor(uptimeSec / 60);
         const secs = uptimeSec % 60;
-        const visitsLine = globalVisits !== null ? globalVisits : "unavailable";
 
         return `<span class="output">== session.stats ==
 Session uptime : ${mins}m ${secs}s
 Commands run   : ${commandsRun}
 Root mode      : ${rootMode ? "active" : "inactive"}
-
-== global.stats ==
-Total visits (all-time) : ${visitsLine}
 </span>`;
       }
 
@@ -497,28 +505,13 @@ Total visits (all-time) : ${visitsLine}
       let currentDirectory = "Terminal"; 
       const files = ["cv.pdf", "profile", "contact", "gym", "guestbook"];
       const directories = []; 
-      const commandsList = ["ls", "cd", "open", "clear", "help", "sudo", "exit", "whoami", "tree", "cat", "cowsay", "stats", "message"];
+      const commandsList = ["ls", "open", "clear", "help", "sudo", "exit", "whoami", "tree", "cat", "cowsay", "stats"];
       let rootMode = false;
       let awaitingSecretAnswer = false;
 
-      // --- Stats de session (client-side) + compteur global partagé ---
+      // --- Stats de session (client-side) ---
       const sessionStart = Date.now();
       let commandsRun = 0;
-      let globalVisits = null;
-
-      // CountAPI : petit compteur public gratuit, sans clé, pensé pour ce
-      // genre d'usage. En cas d'échec (service down), on affiche juste
-      // "unavailable" au lieu de casser la page.
-      async function fetchGlobalVisits() {
-        try {
-          const res = await fetch("https://api.countapi.xyz/hit/xhd-su-terminal/visits");
-          const data = await res.json();
-          globalVisits = data.value;
-        } catch (e) {
-          globalVisits = null;
-        }
-      }
-      fetchGlobalVisits();
       
       // Historique des commandes
       let commandHistory = [];
@@ -703,6 +696,12 @@ Total visits (all-time) : ${visitsLine}
         open: (args) => {
           if (!args[0]) return "Veuillez spécifier un fichier.";
           const name = args[0];
+
+          if (name === "secret" && rootMode) {
+            openInFrame(`${githubBaseURL}/secret/index.html`, "secret");
+            return "Wanna see my secret?";
+          }
+
           const openTargets = {
             "cv.pdf": "cv.pdf",
             "profile": "profile/index.html",
@@ -725,43 +724,6 @@ Total visits (all-time) : ${visitsLine}
         },
         cowsay: (args) => catsay(args.join(" ")),
         stats: () => buildStats(),
-        message: (args) => {
-          const text = args.join(" ");
-          if (!text) return "Usage: message &lt;text&gt;";
-
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(text).catch(() => {
-              output.innerHTML += `<span class="output">[ Clipboard copy failed — you'll need to type your message manually. ]</span><br><br>`;
-            });
-          }
-
-          openInFrame(`${githubBaseURL}/guestbook/index.html`, "guestbook");
-          return `Message copied to clipboard: "${escapeHTML(text)}"<br>Paste it in the box below and sign in with GitHub to post it.`;
-        },
-        cd: (args) => {
-          if (!args[0]) return "Specify a directory.";
-      
-          if (args[0] === "secret" && rootMode) {
-            output.innerHTML += `<span class="output">Wanna see my secret?</span><br>`;
-            setTimeout(() => {
-              window.location.href = `${githubBaseURL}/secret/index.html`;
-            }, 1000);
-            return "";
-          }
-      
-          if (directories.includes(args[0])) {
-            // args[0] est déjà validé contre la whitelist `directories`
-            // (includes), donc sûr à insérer, mais on échappe quand même
-            // par défense en profondeur.
-            output.innerHTML += `<span class="output">Access to '${escapeHTML(args[0])}'...</span><br>`;
-            setTimeout(() => {
-              window.location.href = `${githubBaseURL}/${args[0]}/index.html`;
-            }, 1000);
-            return "";
-          }
-      
-          return "Directory Not Found.";
-        },
         clear: () => {
           output.innerHTML = "";
           return "";
@@ -804,20 +766,36 @@ Total visits (all-time) : ${visitsLine}
           return "[ Root mode exited. You're back to normal user ]";
         },
         help: () => {
-          return `
-<strong>Available commands :</strong><br>
-<span class="output">ls</span> - Displays files and directories in the current directory.<br>
-<span class="output">cd <i>directory</i></span> - Change directory. Example: 'cd projects'.<br>
-<span class="output">open <i>file</i></span> - Opens a file. Example: 'open cv.pdf'.<br>
-<span class="output">cat <i>file</i></span> - Displays file content when available.<br>
-<span class="output">cowsay <i>text</i></span> - Makes the cat say something. Example: 'cowsay hello world'.<br>
-<span class="output">stats</span> - Displays session and global stats.<br>
-<span class="output">message <i>text</i></span> - Copies your message and opens the guestbook. Example: 'message hey!'.<br>
-<span class="output">clear</span> - Clears the terminal screen.<br>
-<span class="output">whoami</span> - Displays current user.<br>
-<span class="output">tree</span> - Displays directory tree.<br>
-<span class="output">help</span> - Displays the list of commands.<br>
-<span class="output">su...</span> - Nevermind haha...<br>`;
+          const groups = [
+            ["Files", [
+              ["ls", "list available files"],
+              ["cat <file>", "show file content, if available"],
+              ["open <file>", "open a file (cv.pdf, profile, contact, gym, guestbook)"],
+              ["tree", "show file tree"]
+            ]],
+            ["Fun", [
+              ["cowsay <text>", "make the cat say something"],
+              ["stats", "session + global stats"]
+            ]],
+            ["System", [
+              ["whoami", "show current user"],
+              ["clear", "clear the screen"],
+              ["help", "show this list"],
+              ["su...", "nevermind haha..."]
+            ]]
+          ];
+
+          const colWidth = Math.max(...groups.flatMap(([, cmds]) => cmds.map(([c]) => c.length))) + 3;
+
+          const body = groups.map(([title, cmds]) => {
+            const rows = cmds.map(([cmd, desc]) => `  ${cmd.padEnd(colWidth)}${desc}`).join("\n");
+            return `<span class="section-title">${title}</span>\n${rows}`;
+          }).join("\n\n");
+
+          return `<span class="output">== help.txt ==
+
+${body}
+</span>`;
         }
       };
 
