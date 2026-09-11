@@ -45,10 +45,9 @@ body {
 }
 
 .terminal {
-  width: 98vw;
-  max-width: 98vw;
-  height: 96vh;
-  margin: 2vh auto;
+  width: 92vw;
+  height: 90vh;
+  margin: 4vh auto;
   padding: clamp(12px, 2vw, 24px);
   display: flex;
   flex-direction: column;
@@ -65,6 +64,7 @@ body {
   z-index: 1;
   transition: border 0.3s ease, box-shadow 0.3s ease;
   cursor: text;
+  box-sizing: border-box;
 }
 
 /* Effet CRT discret : légères scanlines superposées */
@@ -255,6 +255,45 @@ pre {
   background: #000;
 }
 
+#frame-wrapper {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+#frame-wrapper #page-frame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+}
+
+#frame-loading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  border: 1px solid #00FF00;
+  border-radius: 6px;
+  color: #00FF00;
+  font-family: 'Courier New', monospace;
+  font-size: 1.2em;
+  letter-spacing: 1px;
+  z-index: 3;
+  transition: opacity 0.2s ease;
+}
+
+#frame-loading.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
 #back-to-terminal {
   align-self: center;
   background: #000;
@@ -289,7 +328,12 @@ pre {
       </div>
     </div>
     <div id="page-view">
-      <iframe id="page-frame" title="Page intégrée"></iframe>
+      <div id="frame-wrapper">
+        <iframe id="page-frame" title="Page intégrée"></iframe>
+        <div id="frame-loading" class="hidden">
+          <span id="loading-text">Loading...</span>
+        </div>
+      </div>
       <button id="back-to-terminal" type="button">← back to terminal</button>
     </div>
   </div>
@@ -315,6 +359,8 @@ pre {
       const pageView = document.getElementById("page-view");
       const pageFrame = document.getElementById("page-frame");
       const backButton = document.getElementById("back-to-terminal");
+      const frameLoading = document.getElementById("frame-loading");
+      const loadingText = document.getElementById("loading-text");
       const canvas = document.getElementById("particles-canvas");
       const ctx = canvas.getContext("2d");
 
@@ -331,7 +377,29 @@ pre {
 
       // Affiche une page dans un iframe DANS le cadre du terminal, sans
       // jamais quitter index.html. Un bouton permet de revenir au shell.
-      function openInFrame(url) {
+      let spinnerInterval = null;
+      const spinnerFrames = ["|", "/", "-", "\\"];
+
+      function showLoading(label) {
+        frameLoading.classList.remove("hidden");
+        let i = 0;
+        loadingText.textContent = `Loading ${label}... ${spinnerFrames[0]}`;
+        clearInterval(spinnerInterval);
+        spinnerInterval = setInterval(() => {
+          i = (i + 1) % spinnerFrames.length;
+          loadingText.textContent = `Loading ${label}... ${spinnerFrames[i]}`;
+        }, 150);
+      }
+
+      function hideLoading() {
+        clearInterval(spinnerInterval);
+        frameLoading.classList.add("hidden");
+      }
+
+      pageFrame.addEventListener("load", hideLoading);
+
+      function openInFrame(url, label) {
+        showLoading(label);
         pageFrame.src = url;
         pageView.classList.add("active");
         document.getElementById("input-line").style.display = "none";
@@ -341,6 +409,7 @@ pre {
       function closeFrame() {
         pageView.classList.remove("active");
         pageFrame.src = "about:blank";
+        hideLoading();
         output.style.display = "";
         document.getElementById("input-line").style.display = "flex";
         commandInput.focus();
@@ -385,6 +454,32 @@ pre {
       }
       resizeCanvas();
       window.addEventListener("resize", resizeCanvas);
+
+      // Redimensionnement dynamique du terminal : recalculé à chaque
+      // changement réel de la fenêtre (resize, rotation, clavier virtuel...)
+      // plutôt que de dépendre uniquement des unités CSS vw/vh, qui ne
+      // tiennent pas compte des barres d'interface mobiles.
+      function getViewportSize() {
+        if (window.visualViewport) {
+          return { w: window.visualViewport.width, h: window.visualViewport.height };
+        }
+        return { w: window.innerWidth, h: window.innerHeight };
+      }
+
+      function sizeTerminal() {
+        const { w, h } = getViewportSize();
+        const margin = Math.max(12, Math.min(w, h) * 0.02);
+        terminal.style.margin = `${margin}px auto`;
+        terminal.style.width = `${w - margin * 2}px`;
+        terminal.style.height = `${h - margin * 2}px`;
+      }
+
+      sizeTerminal();
+      window.addEventListener("resize", sizeTerminal);
+      window.addEventListener("orientationchange", sizeTerminal);
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", sizeTerminal);
+      }
 
       // Classe Particule
       class Particle {
@@ -534,7 +629,7 @@ pre {
             "gym": "gym/index.html"
           };
           if (currentDirectory === "Terminal" && openTargets[name]) {
-            openInFrame(`${githubBaseURL}/${openTargets[name]}`);
+            openInFrame(`${githubBaseURL}/${openTargets[name]}`, name);
             return `Opening ${escapeHTML(name)}...`;
           }
           return "404 File Not Found.";
