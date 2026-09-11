@@ -497,7 +497,7 @@ Total visits (all-time) : ${visitsLine}
       let currentDirectory = "Terminal"; 
       const files = ["cv.pdf", "profile", "contact", "gym", "guestbook"];
       const directories = []; 
-      const commandsList = ["ls", "cd", "open", "clear", "help", "sudo", "exit", "whoami", "tree", "cat", "cowsay", "stats"];
+      const commandsList = ["ls", "cd", "open", "clear", "help", "sudo", "exit", "whoami", "tree", "cat", "cowsay", "stats", "message"];
       let rootMode = false;
       let awaitingSecretAnswer = false;
 
@@ -725,6 +725,19 @@ Total visits (all-time) : ${visitsLine}
         },
         cowsay: (args) => catsay(args.join(" ")),
         stats: () => buildStats(),
+        message: (args) => {
+          const text = args.join(" ");
+          if (!text) return "Usage: message &lt;text&gt;";
+
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).catch(() => {
+              output.innerHTML += `<span class="output">[ Clipboard copy failed — you'll need to type your message manually. ]</span><br><br>`;
+            });
+          }
+
+          openInFrame(`${githubBaseURL}/guestbook/index.html`, "guestbook");
+          return `Message copied to clipboard: "${escapeHTML(text)}"<br>Paste it in the box below and sign in with GitHub to post it.`;
+        },
         cd: (args) => {
           if (!args[0]) return "Specify a directory.";
       
@@ -799,6 +812,7 @@ Total visits (all-time) : ${visitsLine}
 <span class="output">cat <i>file</i></span> - Displays file content when available.<br>
 <span class="output">cowsay <i>text</i></span> - Makes the cat say something. Example: 'cowsay hello world'.<br>
 <span class="output">stats</span> - Displays session and global stats.<br>
+<span class="output">message <i>text</i></span> - Copies your message and opens the guestbook. Example: 'message hey!'.<br>
 <span class="output">clear</span> - Clears the terminal screen.<br>
 <span class="output">whoami</span> - Displays current user.<br>
 <span class="output">tree</span> - Displays directory tree.<br>
