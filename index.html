@@ -431,13 +431,94 @@ pre {
         return div.innerHTML;
       }
 
+      // --- cowsay, version "chat" pour rester cohérent avec le thème du site ---
+      function wrapText(text, width) {
+        const words = text.split(/\s+/).filter(Boolean);
+        const lines = [];
+        let current = "";
+        for (const word of words) {
+          const candidate = current ? `${current} ${word}` : word;
+          if (candidate.length > width) {
+            if (current) lines.push(current);
+            current = word;
+          } else {
+            current = candidate;
+          }
+        }
+        if (current) lines.push(current);
+        if (lines.length === 0) lines.push("");
+        return lines;
+      }
+
+      function catsay(text) {
+        const raw = (text && text.trim()) ? text.trim() : "Meow?";
+        const lines = wrapText(raw, 40);
+        const maxLen = Math.max(...lines.map(l => l.length));
+
+        const top = " " + "_".repeat(maxLen + 2);
+        const bottom = " " + "-".repeat(maxLen + 2);
+
+        const body = lines.map((l, i) => {
+          const padded = escapeHTML(l.padEnd(maxLen));
+          if (lines.length === 1) return `&lt; ${padded} &gt;`;
+          if (i === 0) return `/ ${padded} \\`;
+          if (i === lines.length - 1) return `\\ ${padded} /`;
+          return `| ${padded} |`;
+        }).join("\n");
+
+        return `<span class="output">${top}
+${body}
+${bottom}
+        \\
+         \\
+           /\\_/\\
+          ( o.o )
+           &gt; ^ &lt;</span>`;
+      }
+
+      // --- stats : session (client) + compteur global partagé (CountAPI) ---
+      function buildStats() {
+        const uptimeSec = Math.floor((Date.now() - sessionStart) / 1000);
+        const mins = Math.floor(uptimeSec / 60);
+        const secs = uptimeSec % 60;
+        const visitsLine = globalVisits !== null ? globalVisits : "unavailable";
+
+        return `<span class="output">== session.stats ==
+Session uptime : ${mins}m ${secs}s
+Commands run   : ${commandsRun}
+Root mode      : ${rootMode ? "active" : "inactive"}
+
+== global.stats ==
+Total visits (all-time) : ${visitsLine}
+</span>`;
+      }
+
       // Variables d'état
       let currentDirectory = "Terminal"; 
-      const files = ["cv.pdf", "profile", "contact", "gym"];
+      const files = ["cv.pdf", "profile", "contact", "gym", "guestbook"];
       const directories = []; 
-      const commandsList = ["ls", "cd", "open", "clear", "help", "sudo", "exit", "whoami", "tree", "cat"];
+      const commandsList = ["ls", "cd", "open", "clear", "help", "sudo", "exit", "whoami", "tree", "cat", "cowsay", "stats"];
       let rootMode = false;
       let awaitingSecretAnswer = false;
+
+      // --- Stats de session (client-side) + compteur global partagé ---
+      const sessionStart = Date.now();
+      let commandsRun = 0;
+      let globalVisits = null;
+
+      // CountAPI : petit compteur public gratuit, sans clé, pensé pour ce
+      // genre d'usage. En cas d'échec (service down), on affiche juste
+      // "unavailable" au lieu de casser la page.
+      async function fetchGlobalVisits() {
+        try {
+          const res = await fetch("https://api.countapi.xyz/hit/xhd-su-terminal/visits");
+          const data = await res.json();
+          globalVisits = data.value;
+        } catch (e) {
+          globalVisits = null;
+        }
+      }
+      fetchGlobalVisits();
       
       // Historique des commandes
       let commandHistory = [];
@@ -626,7 +707,8 @@ pre {
             "cv.pdf": "cv.pdf",
             "profile": "profile/index.html",
             "contact": "contact/index.html",
-            "gym": "gym/index.html"
+            "gym": "gym/index.html",
+            "guestbook": "guestbook/index.html"
           };
           if (currentDirectory === "Terminal" && openTargets[name]) {
             openInFrame(`${githubBaseURL}/${openTargets[name]}`, name);
@@ -641,6 +723,8 @@ pre {
           if (files.includes(name)) return `cat: ${escapeHTML(name)}: use 'open ${escapeHTML(name)}' to view this file.`;
           return `cat: ${escapeHTML(name)}: No such file.`;
         },
+        cowsay: (args) => catsay(args.join(" ")),
+        stats: () => buildStats(),
         cd: (args) => {
           if (!args[0]) return "Specify a directory.";
       
@@ -713,6 +797,8 @@ pre {
 <span class="output">cd <i>directory</i></span> - Change directory. Example: 'cd projects'.<br>
 <span class="output">open <i>file</i></span> - Opens a file. Example: 'open cv.pdf'.<br>
 <span class="output">cat <i>file</i></span> - Displays file content when available.<br>
+<span class="output">cowsay <i>text</i></span> - Makes the cat say something. Example: 'cowsay hello world'.<br>
+<span class="output">stats</span> - Displays session and global stats.<br>
 <span class="output">clear</span> - Clears the terminal screen.<br>
 <span class="output">whoami</span> - Displays current user.<br>
 <span class="output">tree</span> - Displays directory tree.<br>
@@ -776,6 +862,7 @@ pre {
           if (command) {
             commandHistory.push(command);
             historyIndex = -1;
+            commandsRun++;
           }
           commandInput.value = "";
           ghost.textContent = "";
