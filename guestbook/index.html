@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Guestbook</title>
+  <link rel="icon" href="/Terminal/favicon.ico" type="image/x-icon">
+  <style>
+    body {
+      background-color: #000;
+      color: #00ff00;
+      font-family: 'Courier New', Courier, monospace;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 1.6rem;
+    }
+    p.intro {
+      margin: 0 0 20px 0;
+      color: #55ff55;
+      font-size: 0.95rem;
+    }
+    /* Giscus injecte son propre iframe ici, on lui laisse juste la place */
+    #giscus-container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+  </style>
+</head>
+<body>
+  <h1># guestbook.log</h1>
+  <p class="intro">Laisse un petit message — connexion GitHub requise (anti-spam natif, modération possible depuis les Discussions du repo).</p>
+
+  <div id="giscus-container">
+    <script src="https://giscus.app/client.js"
+        data-repo="xhd-su/Terminal"
+        data-repo-id="R_kgDOOjWTUw"
+        data-category="Guestbook"
+        data-category-id="DIC_kwDOOjWTU84DFZKe"
+        data-mapping="specific"
+        data-term="guestbook"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="bottom"
+        data-theme="dark"
+        data-lang="en"
+        crossorigin="anonymous"
+        async>
+    </script>
+  </div>
+</body>
+</html>
