@@ -46,10 +46,10 @@ body {
 
 .terminal {
   width: 1500px;
-  max-width: 90%;
-  height: 600px;
-  margin: 40px auto;
-  padding: 20px;
+  max-width: 92%;
+  height: min(600px, 80vh);
+  margin: clamp(16px, 4vh, 40px) auto;
+  padding: clamp(12px, 2vw, 20px);
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -59,9 +59,37 @@ body {
   background-color: #000;
   color: #00FF00;
   font-family: 'Courier New', Courier, monospace;
+  font-size: clamp(13px, 1.6vw, 18px);
   position: relative;
+  overflow: hidden;
   z-index: 1;
   transition: border 0.3s ease, box-shadow 0.3s ease;
+  cursor: text;
+}
+
+/* Effet CRT discret : légères scanlines superposées */
+.terminal::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 255, 0, 0.025) 0px,
+    rgba(0, 255, 0, 0.025) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  pointer-events: none;
+  z-index: 2;
+  border-radius: 10px;
+}
+
+/* Léger halo qui s'intensifie quand on interagit avec le terminal */
+.terminal:focus-within {
+  box-shadow: 0 0 22px #00FF00;
 }
 
 /* Effet glitch */
@@ -93,6 +121,15 @@ body {
   100% {
     transform: translate(0);
     filter: hue-rotate(0deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glitch {
+    animation: none;
+  }
+  #particles-canvas {
+    display: none;
   }
 }
 
@@ -129,14 +166,43 @@ pre {
   color: #00FF00;
 }
 
+#output a {
+  color: #00ff88;
+  text-decoration: underline;
+}
+
+#output a:hover {
+  color: #66ff66;
+}
+
+#input-wrapper {
+  position: relative;
+  flex-grow: 1;
+  line-height: 1.5em;
+}
+
+#ghost {
+  position: absolute;
+  top: 0;
+  left: 0;
+  white-space: pre;
+  font-family: 'Courier New', monospace;
+  font-size: inherit;
+  line-height: 1.5em;
+  color: rgba(0, 255, 0, 0.38);
+  pointer-events: none;
+  user-select: none;
+}
+
 #command {
+  position: relative;
   background: transparent;
   border: none;
   color: #00FF00;
   outline: none;
   font-family: 'Courier New', monospace;
   font-size: 18px;
-  flex-grow: 1;
+  width: 100%;
   padding: 0;
   margin: 0;
   line-height: 1.5em;
@@ -158,24 +224,83 @@ pre {
   width: 10px;
   height: 1.5em;
   background-color: #00FF00;
+  box-shadow: 0 0 8px #00FF00, 0 0 14px #00FF00;
   animation: blink 0.8s infinite;
 }
 
 @keyframes blink {
   50% { opacity: 0; }
 }
+
+/* Vue "page ouverte" : remplace output+input-line à l'intérieur du même cadre */
+#page-view {
+  display: none;
+  flex-direction: column;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  gap: 10px;
+}
+
+#page-view.active {
+  display: flex;
+}
+
+#page-frame {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  border: 1px solid #00FF00;
+  border-radius: 6px;
+  background: #000;
+}
+
+#back-to-terminal {
+  align-self: center;
+  background: #000;
+  color: #00FF00;
+  border: 1px solid #00FF00;
+  border-radius: 6px;
+  padding: 8px 22px;
+  font-family: 'Courier New', monospace;
+  font-size: 15px;
+  cursor: pointer;
+  box-shadow: 0 0 8px #00FF00;
+  transition: all 0.2s ease;
+}
+
+#back-to-terminal:hover {
+  background: #00FF00;
+  color: #000;
+}
+
   </style>
 </head>
 <body>
   <canvas id="particles-canvas"></canvas>
   
   <div class="terminal">
-    <pre id="output"></pre>
+    <pre id="output" aria-live="polite"></pre>
     <div id="input-line" style="display: none; width: 100%;">
       <span id="baseprompt" class="prompt">Terminal@guest:~# </span>
-      <input type="text" id="command" autofocus>
+      <div id="input-wrapper">
+        <div id="ghost" aria-hidden="true"></div>
+        <input type="text" id="command" autofocus aria-label="Terminal command input">
+      </div>
+    </div>
+    <div id="page-view">
+      <iframe id="page-frame" title="Page intégrée"></iframe>
+      <button id="back-to-terminal" type="button">← back to terminal</button>
     </div>
   </div>
+
+  <noscript>
+    <div style="font-family: monospace; color: #0f0; background:#000; padding:2rem; max-width:700px; margin:2rem auto;">
+      <h1>xhd — Cybersecurity / SOC / Linux</h1>
+      <p>This portfolio normally runs as an interactive terminal, but it requires JavaScript.</p>
+      <p><a href="cv.pdf" style="color:#0f0;">Download my CV</a></p>
+    </div>
+  </noscript>
   
   <script>
     if (/Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
@@ -186,17 +311,201 @@ pre {
       const output = document.getElementById("output");
       const commandInput = document.getElementById("command");
       const terminal = document.querySelector(".terminal");
+      const ghost = document.getElementById("ghost");
+      const pageView = document.getElementById("page-view");
+      const pageFrame = document.getElementById("page-frame");
+      const backButton = document.getElementById("back-to-terminal");
       const canvas = document.getElementById("particles-canvas");
       const ctx = canvas.getContext("2d");
+
+      // Confort d'usage : cliquer n'importe où dans le terminal focus l'input,
+      // sauf si on sélectionne du texte dans l'output.
+      terminal.addEventListener("click", () => {
+        if (window.getSelection().toString().length === 0) {
+          commandInput.focus();
+        }
+      });
 
       // Nom du repo GitHub Pages
       const githubBaseURL = "https://xhd-su.github.io/Terminal";
 
+      // Affiche une page dans un iframe DANS le cadre du terminal, sans
+      // jamais quitter index.html. Un bouton permet de revenir au shell.
+      function openInFrame(url) {
+        pageFrame.src = url;
+        pageView.classList.add("active");
+        document.getElementById("input-line").style.display = "none";
+        output.style.display = "none";
+      }
+
+      function closeFrame() {
+        pageView.classList.remove("active");
+        pageFrame.src = "about:blank";
+        output.style.display = "";
+        document.getElementById("input-line").style.display = "flex";
+        commandInput.focus();
+        output.innerHTML += `<span class="output">[ Returned to terminal ]</span><br><br>`;
+        setTimeout(() => {
+          output.scrollTop = output.scrollHeight;
+        }, 50);
+      }
+
+      backButton.addEventListener("click", closeFrame);
+
+      // --- Sécurité : échappement HTML ---
+      // Toute valeur qui provient de l'utilisateur (commande tapée, arguments)
+      // DOIT passer par escapeHTML() avant d'être insérée via innerHTML.
+      // Sans ça, taper par ex. <img src=x onerror=alert(1)> exécute du JS (XSS).
+      function escapeHTML(str) {
+        const div = document.createElement("div");
+        div.textContent = str;
+        return div.innerHTML;
+      }
+
+      // --- Contenu des "fichiers" affichés via cat ---
+      // Ces pages étaient auparavant des répertoires séparés (cd contact/gym/profile).
+      // Elles sont maintenant simulées comme des fichiers texte : 'cat' affiche
+      // un résumé dans le terminal, 'open' redirige vers la page complète.
+
+      function catProfile() {
+        return `<span class="output">== profile.sys ==
+[USER_PROFILE]
+status=active
+age=23
+role=cybersecurity_student
+school=HELMo
+specialization=SOC_analysis, networks, scripting, DFIR
+learning_platform=TryHackMe
+summary="Passionate about offensive & defensive security. Always learning, always hacking."
+
+== skills.db ==
++---------------------+--------------------------------------------------------+
+| category            | skills                                                 |
++---------------------+--------------------------------------------------------+
+| SOC Tools           | Alert Analysis, Log Correlation, SIEM (e.g. Splunk)    |
+| Programming         | Python, C#, HTML, CSS, JavaScript, SQL                 |
+| Networking          | VLANs, Firewalls, Operating Systems                    |
+| Game Development    | Unity                                                  |
+| Linux & Scripting   | Bash, Systemctl, File Permissions, Cron                |
+| DFIR Tools          | Volatility, Autopsy, Log carving, Timeline analysis    |
++---------------------+--------------------------------------------------------+
+
+== traits.ini ==
+[Personality]
+calm_under_pressure=true
+dedicated=absolutely
+problem_solving=excellent
+discipline=high
+focus=sharp
+thinking_style=adaptive
+
+== work.log ==
+[2021-07-03] Job started: Cleaner @ GOM
+[2022-08-05] Job ended:   Cleaner @ GOM
+[2022-06-27] Job started: Cleaner @ ISS
+[2026-08-14] Job ended:   Cleaner @ ISS
+[UNKNOWN] Side task:   Mover/Delivery - various contracts
+
+== hobbies.cfg ==
+[Hobbies]
+powerlifting=enabled
+cats=always_present
+coffee=mandatory
+ctf_competitions=frequent
+game_development=ongoing
+</span>`;
+      }
+
+      function catContact() {
+        return `<span class="output">== contact_info.txt ==
+
+Email:
+  mahichahid2003@gmail.com
+
+GitHub:
+  <a href="https://github.com/xhd-su" target="_blank" rel="noopener">github.com/xhd-su</a>
+
+Social:
+  <a href="https://www.instagram.com/ibn_chafik/" target="_blank" rel="noopener">@ibn_chafik (Instagram)</a>
+  <a href="https://www.linkedin.com/in/chahid-mahi-4b0709250/" target="_blank" rel="noopener">@Mahi_Chahid (LinkedIn)</a>
+  <a href="https://tryhackme.com/p/xhd" target="_blank" rel="noopener">@xhd (TryHackMe)</a>
+  <a href="https://discordapp.com/users/xhd_00" target="_blank" rel="noopener">@xhd (Discord)</a>
+  <a href="https://steamcommunity.com/id/afriquedusud/" target="_blank" rel="noopener">@su (Steam)</a>
+  <a href="https://www.faceit.com/en/players/MaRTyR_exe" target="_blank" rel="noopener">@xhd_su (Faceit)</a>
+  <a href="https://www.youtube.com/channel/UCHdLZZPCp3JX7KKefog9VpQ" target="_blank" rel="noopener">I Meow Back To Kittens (YouTube)</a>
+</span>`;
+      }
+
+      function calculateDOTS(bodyweight, total) {
+        const a = -0.000001093, b = 0.0007391293, c = -0.1918759221, d = 24.0900756, e = -307.75076;
+        const coeff = a * bodyweight ** 4 + b * bodyweight ** 3 + c * bodyweight ** 2 + d * bodyweight + e;
+        return (total * 500) / coeff;
+      }
+
+      function asciiBar(percent) {
+        const total = 10;
+        const filled = Math.round((percent / 100) * total);
+        return "[" + "#".repeat(filled) + "-".repeat(total - filled) + "]";
+      }
+
+      function timeSinceGymStart() {
+        const startDate = new Date(2021, 9, 20);
+        const today = new Date();
+        let years = today.getFullYear() - startDate.getFullYear();
+        let months = today.getMonth() - startDate.getMonth();
+        let days = today.getDate() - startDate.getDate();
+        if (days < 0) {
+          months--;
+          days += new Date(today.getFullYear(), today.getMonth(), 0).getDate();
+        }
+        if (months < 0) {
+          years--;
+          months += 12;
+        }
+        return `${years} years - ${months} months - ${days} days`;
+      }
+
+      function catGym() {
+        const squatPR = 170, squatGoal = 220;
+        const benchPR = 140, benchGoal = 160;
+        const deadliftPR = 210, deadliftGoal = 260;
+        const totalPR = squatPR + benchPR + deadliftPR;
+        const totalGoal = squatGoal + benchGoal + deadliftGoal;
+        const bodyweight = 90;
+        const dots = calculateDOTS(bodyweight, totalPR).toFixed(2);
+        const pct = (pr, goal) => Math.min((pr / goal) * 100, 100);
+        const row = (label, pr, goal) =>
+          `  ${label.padEnd(9)}: ${String(pr).padStart(3)} kg  ${asciiBar(pct(pr, goal))} ${pct(pr, goal).toFixed(1)}%  (goal ${goal} kg)`;
+
+        return `<span class="output">== gym.log ==
+Time since first day at gym: ${timeSinceGymStart()}
+
+SBD PRs:
+${row("Squat", squatPR, squatGoal)}
+${row("Bench", benchPR, benchGoal)}
+${row("Deadlift", deadliftPR, deadliftGoal)}
+${row("Total", totalPR, totalGoal)}
+
+DOTS score: ${dots}
+
+Goals:
+  Squat           : 220 kg
+  Bench           : 160 kg
+  Deadlift        : 260 kg
+  Overhead Press  : 100 kg
+  Strict Curl     : 60 kg
+  Weight          : 93 kg
+  Bodyfat         : 10-12%
+
+(full dashboard with charts: 'open gym.txt')
+</span>`;
+      }
+
       // Variables d'état
       let currentDirectory = "Terminal"; 
-      const files = ["cv.pdf"];
-      const directories = ["contact", "gym", "profile"]; 
-      const commandsList = ["ls", "cd", "open", "clear", "help", "sudo", "exit", "whoami", "tree"];
+      const files = ["cv.pdf", "profile.txt", "contact.txt", "gym.txt"];
+      const directories = []; 
+      const commandsList = ["ls", "cd", "open", "clear", "help", "sudo", "exit", "whoami", "tree", "cat"];
       let rootMode = false;
       let awaitingSecretAnswer = false;
       
@@ -318,6 +627,8 @@ pre {
       function typeWriterPart() {
         const part = introParts[currentPart];
         if (index < part.content.length) {
+          // Contenu statique défini par nous-mêmes : pas besoin d'échapper ici,
+          // mais on reste sur innerHTML+= puisque le contenu est fixe et sûr.
           output.innerHTML += part.content.charAt(index);
           index++;
           setTimeout(typeWriterPart, part.speed);
@@ -348,17 +659,33 @@ pre {
           if (currentDirectory === "Terminal") {
             const allDirs = [...directories];
             if (rootMode) allDirs.push("secret");
-            return `${allDirs.join("  ")}  ${files.join("  ")}`;
+            return [...allDirs, ...files].join("  ");
           }
           return "Nothing Found.";
         },
         open: (args) => {
           if (!args[0]) return "Veuillez spécifier un fichier.";
-          if (args[0] === "cv.pdf" && currentDirectory === "Terminal") {
-            window.location.href = `${githubBaseURL}/cv.pdf`;
-            return "Opening cv.pdf...";
+          const name = args[0];
+          const openTargets = {
+            "cv.pdf": "cv.pdf",
+            "profile.txt": "profile/index.html",
+            "contact.txt": "contact/index.html",
+            "gym.txt": "gym/index.html"
+          };
+          if (currentDirectory === "Terminal" && openTargets[name]) {
+            openInFrame(`${githubBaseURL}/${openTargets[name]}`);
+            return `Opening ${escapeHTML(name)}...`;
           }
           return "404 File Not Found.";
+        },
+        cat: (args) => {
+          if (!args[0]) return "Specify a file. Usage: cat &lt;file&gt;";
+          const name = args[0];
+          if (name === "cv.pdf") return "cat: cv.pdf: binary file (use 'open cv.pdf' instead).";
+          if (name === "profile.txt") return catProfile();
+          if (name === "contact.txt") return catContact();
+          if (name === "gym.txt") return catGym();
+          return `cat: ${escapeHTML(name)}: No such file.`;
         },
         cd: (args) => {
           if (!args[0]) return "Specify a directory.";
@@ -372,7 +699,10 @@ pre {
           }
       
           if (directories.includes(args[0])) {
-            output.innerHTML += `<span class="output">Access to '${args[0]}'...</span><br>`;
+            // args[0] est déjà validé contre la whitelist `directories`
+            // (includes), donc sûr à insérer, mais on échappe quand même
+            // par défense en profondeur.
+            output.innerHTML += `<span class="output">Access to '${escapeHTML(args[0])}'...</span><br>`;
             setTimeout(() => {
               window.location.href = `${githubBaseURL}/${args[0]}/index.html`;
             }, 1000);
@@ -428,6 +758,7 @@ pre {
 <span class="output">ls</span> - Displays files and directories in the current directory.<br>
 <span class="output">cd <i>directory</i></span> - Change directory. Example: 'cd projects'.<br>
 <span class="output">open <i>file</i></span> - Opens a file. Example: 'open cv.pdf'.<br>
+<span class="output">cat <i>file</i></span> - Displays file content. Example: 'cat profile.txt'.<br>
 <span class="output">clear</span> - Clears the terminal screen.<br>
 <span class="output">whoami</span> - Displays current user.<br>
 <span class="output">tree</span> - Displays directory tree.<br>
@@ -435,6 +766,30 @@ pre {
 <span class="output">su...</span> - Nevermind haha...<br>`;
         }
       };
+
+      // Confort d'usage : calcule la meilleure complétion possible pour la
+      // valeur actuelle (une commande, ou un argument de commande connue).
+      // Retourne la chaîne complète suggérée, ou "" si rien ne correspond.
+      function bestMatch(value) {
+        if (!value) return "";
+        const parts = value.split(" ");
+        const cmd = parts[0];
+
+        if (parts.length === 1) {
+          const m = commandsList.find(c => c.startsWith(cmd) && c !== cmd);
+          return m || "";
+        }
+
+        if (commandsList.includes(cmd)) {
+          const arg = parts[1] || "";
+          const allDirs = rootMode ? [...directories, "secret"] : directories;
+          const pool = [...allDirs, ...files];
+          const m = pool.find(item => item.startsWith(arg) && item !== arg);
+          if (m) return `${cmd} ${m}`;
+        }
+
+        return "";
+      }
 
       // Gestion des commandes
       commandInput.addEventListener("keydown", (e) => {
@@ -469,13 +824,40 @@ pre {
             historyIndex = -1;
           }
           commandInput.value = "";
+          ghost.textContent = "";
           const p = rootMode ? "Terminal@root:~# ☠" : "Terminal@guest:~#";
-          output.innerHTML += `<span class="prompt">${p} </span><span class="command">${command}</span><br>`;
+          // FIX XSS : la commande tapée par l'utilisateur est échappée
+          // avant d'être injectée dans le HTML.
+          output.innerHTML += `<span class="prompt">${escapeHTML(p)} </span><span class="command">${escapeHTML(command)}</span><br>`;
           executeCommand(command);
+        } else if (e.key === "ArrowRight") {
+          // Accepte la suggestion ghost si le curseur est en fin de saisie.
+          const value = commandInput.value;
+          const match = bestMatch(value);
+          const atEnd = commandInput.selectionStart === value.length;
+          if (atEnd && match && match.length > value.length) {
+            e.preventDefault();
+            commandInput.value = match;
+            ghost.textContent = "";
+          }
         } else if (e.key === "Tab") {
           e.preventDefault();
           autocomplete(commandInput);
         }
+      });
+
+      // Confort d'usage : suggestion "ghost text" intégrée à la ligne de
+      // saisie (comme fish/zsh-autosuggestions) plutôt qu'une liste séparée.
+      // Ne force rien : Tab et Enter gardent leur comportement habituel,
+      // la flèche droite accepte la suggestion affichée.
+      commandInput.addEventListener("input", () => {
+        if (!introDone) {
+          ghost.textContent = "";
+          return;
+        }
+        const value = commandInput.value;
+        const match = bestMatch(value);
+        ghost.textContent = (match && match.length > value.length) ? match : "";
       });
 
       function executeCommand(command) {
@@ -541,7 +923,9 @@ Who am i?
           const result = commands[cmd](args.slice(1));
           if (result) output.innerHTML += `<span class="output">${result}</span><br><br>`;
         } else {
-          output.innerHTML += `<span class="output">Unknown command: ${cmd}</span><br><br>`;
+          // FIX XSS : cmd vient de l'utilisateur, il faut l'échapper
+          // avant de le réafficher dans le message d'erreur.
+          output.innerHTML += `<span class="output">Unknown command: ${escapeHTML(cmd)}</span><br><br>`;
         }
       
         setTimeout(() => {
@@ -558,18 +942,20 @@ Who am i?
         const arg = parts[1] || "";
       
         if (parts.length === 1) {
-          const suggestions = commandsList.filter(c => c.startsWith(cmd));
-          if (suggestions.length === 1) {
-            input.value = suggestions[0] + " ";
-          } else if (suggestions.length > 1) {
-            output.innerHTML += `<span class="output">${suggestions.join("  ")}</span><br><br>`;
+          const matches = commandsList.filter(c => c.startsWith(cmd));
+          if (matches.length === 1) {
+            input.value = matches[0] + " ";
+          } else if (matches.length > 1) {
+            // Ces suggestions viennent d'une liste fixe (commandsList),
+            // donc sûres, mais on échappe par cohérence/défense en profondeur.
+            output.innerHTML += `<span class="output">${escapeHTML(matches.join("  "))}</span><br><br>`;
           }
         } else if (commandsList.includes(cmd)) {
-          const suggestions = [...directories, ...files].filter(item => item.startsWith(arg));
-          if (suggestions.length === 1) {
-            input.value = cmd + " " + suggestions[0] + " ";
-          } else if (suggestions.length > 1) {
-            output.innerHTML += `<span class="output">${suggestions.join("  ")}</span><br><br>`;
+          const matches = [...directories, ...files].filter(item => item.startsWith(arg));
+          if (matches.length === 1) {
+            input.value = cmd + " " + matches[0] + " ";
+          } else if (matches.length > 1) {
+            output.innerHTML += `<span class="output">${escapeHTML(matches.join("  "))}</span><br><br>`;
           }
         }
       
