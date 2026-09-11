@@ -984,7 +984,8 @@ Who am i?
             output.innerHTML += `<span class="output">${escapeHTML(matches.join("  "))}</span><br><br>`;
           }
         } else if (commandsList.includes(cmd)) {
-          const matches = [...directories, ...files].filter(item => item.startsWith(arg));
+          const allDirs = rootMode ? [...directories, "secret"] : directories;
+          const matches = [...allDirs, ...files].filter(item => item.startsWith(arg));
           if (matches.length === 1) {
             input.value = cmd + " " + matches[0] + " ";
           } else if (matches.length > 1) {
